@@ -14,6 +14,12 @@ public static class DbInitializer
             if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
         }
         await db.Database.EnsureCreatedAsync(cancellationToken);
+        await AddColumnIfMissingAsync(db, "Players", "Sports", "TEXT NOT NULL DEFAULT '[]'", cancellationToken);
+        await AddColumnIfMissingAsync(db, "Matches", "Privacy", "TEXT NOT NULL DEFAULT 'public'", cancellationToken);
+        await AddColumnIfMissingAsync(db, "Matches", "CreatorEmail", "TEXT NULL", cancellationToken);
+        await AddColumnIfMissingAsync(db, "Matches", "InvitedEmails", "TEXT NOT NULL DEFAULT '[]'", cancellationToken);
+        await AddColumnIfMissingAsync(db, "Matches", "ModeratorEmails", "TEXT NOT NULL DEFAULT '[]'", cancellationToken);
+        await AddColumnIfMissingAsync(db, "Matches", "Notes", "TEXT NULL", cancellationToken);
         if (await db.Matches.AnyAsync(cancellationToken)) return;
 
         var players = new[]
@@ -41,6 +47,18 @@ public static class DbInitializer
         db.Players.AddRange(players);
         db.Matches.Add(match);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task AddColumnIfMissingAsync(QuadraJustaDbContext db, string table, string column, string definition, CancellationToken cancellationToken)
+    {
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = $"PRAGMA table_info({table})";
+        if (command.Connection?.State != System.Data.ConnectionState.Open) await db.Database.OpenConnectionAsync(cancellationToken);
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken)) if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase)) return;
+        }
+        try { await db.Database.ExecuteSqlRawAsync($"ALTER TABLE {table} ADD COLUMN {column} {definition}", cancellationToken); } catch (Microsoft.Data.Sqlite.SqliteException) { }
     }
 
     private static PlayerRecord NewPlayer(string name, string initials, string position, double level, string trait) => new()

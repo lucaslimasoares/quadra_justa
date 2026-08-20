@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using QuadraJusta.Domain.Entities;
 using QuadraJusta.Domain.Interfaces;
@@ -28,6 +29,7 @@ public sealed class EfPlayerRepository(QuadraJustaDbContext db) : IPlayerReposit
         record.Position = player.Position;
         record.Level = player.Level;
         record.Trait = player.Trait;
+        record.Sports = JsonSerializer.Serialize(player.Sports);
         await db.SaveChangesAsync(cancellationToken);
         return player;
     }
@@ -35,9 +37,9 @@ public sealed class EfPlayerRepository(QuadraJustaDbContext db) : IPlayerReposit
     private static PlayerRecord ToRecord(Player player) => new()
     {
         Id = player.Id, Name = player.Name, Initials = player.Initials, Position = player.Position,
-        Level = player.Level, Trait = player.Trait
+        Level = player.Level, Trait = player.Trait, Sports = JsonSerializer.Serialize(player.Sports)
     };
 
     private static Expression<Func<PlayerRecord, Player>> ToDomain() => player =>
-        new Player(player.Id, player.Name, player.Initials, player.Position, player.Level, player.Trait);
+        new Player(player.Id, player.Name, player.Initials, player.Position, player.Level, player.Trait, JsonSerializer.Deserialize<List<string>>(player.Sports) ?? new List<string>());
 }

@@ -8,5 +8,6 @@ public sealed class PlayerRecord
     public string Position { get; set; } = string.Empty;
     public double Level { get; set; }
     public string Trait { get; set; } = string.Empty;
+    public string Sports { get; set; } = "[]";
     public ICollection<MatchPlayerRecord> Matches { get; set; } = [];
 }

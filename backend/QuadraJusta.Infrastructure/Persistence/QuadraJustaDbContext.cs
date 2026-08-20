@@ -20,6 +20,7 @@ public sealed class QuadraJustaDbContext(DbContextOptions<QuadraJustaDbContext> 
             entity.Property(player => player.Position).HasMaxLength(40).IsRequired();
             entity.Property(player => player.Level).IsRequired();
             entity.Property(player => player.Trait).HasMaxLength(240).IsRequired();
+            entity.Property(player => player.Sports).HasMaxLength(500).IsRequired();
         });
 
         modelBuilder.Entity<MatchRecord>(entity =>
@@ -30,6 +31,10 @@ public sealed class QuadraJustaDbContext(DbContextOptions<QuadraJustaDbContext> 
             entity.Property(match => match.Venue).HasMaxLength(200).IsRequired();
             entity.Property(match => match.Date).IsRequired();
             entity.Property(match => match.MaxPlayers).IsRequired();
+            entity.Property(match => match.Privacy).HasMaxLength(20).IsRequired();
+            entity.Property(match => match.InvitedEmails).HasMaxLength(4000).IsRequired();
+            entity.Property(match => match.ModeratorEmails).HasMaxLength(4000).IsRequired();
+            entity.Property(match => match.Notes).HasMaxLength(1000);
         });
 
         modelBuilder.Entity<MatchPlayerRecord>(entity =>

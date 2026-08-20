@@ -21,7 +21,9 @@ using (var scope = app.Services.CreateScope())
 app.UseCors();
 var matches = app.MapGroup("/api/matches").WithTags("Matches");
 matches.MapGet("/upcoming", async (IMatchService service, CancellationToken ct) => (await service.GetUpcomingAsync(ct)) is { } match ? Results.Ok(match) : Results.NotFound());
-matches.MapPost("/upcoming/teams", async (GenerateTeamsRequest request, IMatchService service, CancellationToken ct) => { try { return (await service.GenerateTeamsAsync(request, ct)) is { } teams ? Results.Ok(teams) : Results.NotFound(); } catch (ArgumentOutOfRangeException) { return Results.BadRequest("A partida deve ter 2 ou 3 times."); } });
+matches.MapGet("/", async (string? email, IMatchService service, CancellationToken ct) => Results.Ok(await service.GetVisibleAsync(email ?? string.Empty, ct)));
+matches.MapPost("/", async (CreateMatchRequest request, IMatchService service, CancellationToken ct) => { try { return Results.Created("/api/matches", await service.CreateAsync(request, ct)); } catch (ArgumentException exception) { return Results.BadRequest(exception.Message); } });
+matches.MapPost("/{id:guid}/teams", async (Guid id, string? email, GenerateTeamsRequest request, IMatchService service, CancellationToken ct) => { try { return (await service.GenerateTeamsAsync(id, email ?? string.Empty, request, ct)) is { } teams ? Results.Ok(teams) : Results.NotFound(); } catch (UnauthorizedAccessException) { return Results.Forbid(); } catch (ArgumentOutOfRangeException) { return Results.BadRequest("A partida deve ter 2 ou 3 times."); } });
 var players = app.MapGroup("/api/players").WithTags("Players");
 players.MapGet("/", async (IPlayerService service, CancellationToken ct) => Results.Ok(await service.GetAllAsync(ct)));
 players.MapPost("/", async (CreatePlayerRequest request, IPlayerService service, CancellationToken ct) =>
