@@ -26,16 +26,18 @@ public sealed class PlayerService(IPlayerRepository repository) : IPlayerService
     {
         var name = request.Name?.Trim() ?? string.Empty;
         var position = request.Position?.Trim() ?? string.Empty;
+        var sports = request.Sports?.Where(sport => !string.IsNullOrWhiteSpace(sport)).Select(sport => sport.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? [];
         if (name.Length < 2) throw new ArgumentException("Informe o nome do jogador.");
         if (position.Length == 0) throw new ArgumentException("Selecione a posição principal.");
+        if (sports.Count == 0) throw new ArgumentException("Selecione ao menos uma modalidade.");
         if (request.Level is < 1 or > 10 || request.Level * 2 != Math.Round(request.Level * 2)) throw new ArgumentException("O nível deve estar entre 1 e 10, em intervalos de meio ponto.");
 
         var initials = string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Take(2).Select(part => char.ToUpperInvariant(part[0])));
         var trait = string.IsNullOrWhiteSpace(request.Trait) ? "Perfil em atualização" : request.Trait.Trim();
-        var player = new Player(id, name, initials, position, request.Level, trait, isConfirmed);
+        var player = new Player(id, name, initials, position, request.Level, trait, sports, isConfirmed);
         return update ? await repository.UpdateAsync(player, ct) : await repository.AddAsync(player, ct);
     }
 
-    private static PlayerDto ToDto(Player player) => new(player.Id, player.Name, player.Initials, player.Position, player.Level, player.Trait);
+    private static PlayerDto ToDto(Player player) => new(player.Id, player.Name, player.Initials, player.Position, player.Level, player.Trait, player.Sports);
 }
