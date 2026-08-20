@@ -12,5 +12,7 @@ public sealed class MatchRecord
     public string InvitedEmails { get; set; } = "[]";
     public string ModeratorEmails { get; set; } = "[]";
     public string? Notes { get; set; }
+    public string MatchRules { get; set; } = "[]";
+    public string DrawRules { get; set; } = "[]";
     public ICollection<MatchPlayerRecord> Players { get; set; } = [];
 }

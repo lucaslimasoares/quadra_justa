@@ -15,7 +15,7 @@ Protótipo full-stack para organizar peladas e gerar times equilibrados.
 Em dois terminais:
 
 ```bash
-cd backend && dotnet run --project QuadraJusta.Api
+cd backend && dotnet run --project QuadraJusta.Api --urls http://localhost:5000
 cd frontend && npm install && npm run dev
 ```
 

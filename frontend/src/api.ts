@@ -2,7 +2,12 @@ import type { CreateMatch, CreatePlayer, Match, Player, TeamsResult } from './ty
 
 const request = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`/api${path}`, { headers: { 'Content-Type': 'application/json' }, ...init })
-  if (!response.ok) throw new Error('Não foi possível carregar os dados.')
+  if (!response.ok) {
+    const detail = await response.text()
+    if (response.status === 403) throw new Error('Apenas administradores e moderadores podem gerar times.')
+    if (response.status === 404) throw new Error('A API atual não encontrou a rota da geração. Reinicie o backend.')
+    throw new Error(detail || `Não foi possível carregar os dados (HTTP ${response.status}).`)
+  }
   return response.json()
 }
 

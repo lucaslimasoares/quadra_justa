@@ -20,12 +20,13 @@ function App() {
   const [teams, setTeams] = useState<TeamsResult | null>(null)
   const [teamCount, setTeamCount] = useState(2)
   const [loading, setLoading] = useState(false)
+  const [generateError, setGenerateError] = useState('')
   const [players, setPlayers] = useState<Player[]>(fallback.players)
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null)
   useEffect(() => { if (!authenticated) return; getMatches(getSessionEmail()).then(items => { setMatches(items); if (items[0]) setMatch(items[0]) }).catch(() => getUpcomingMatch().then(setMatch).catch(() => undefined)) }, [authenticated])
   useEffect(() => { const handleStorage = () => setAuthenticated(hasSession()); window.addEventListener('storage', handleStorage); return () => window.removeEventListener('storage', handleStorage) }, [])
   const openPlayers = () => { getPlayers().then(setPlayers).catch(() => undefined); setScreen('players') }
-  const makeTeams = async () => { setLoading(true); try { setTeams(await generateTeams(match.id, getSessionEmail(), teamCount)); setScreen('result') } finally { setLoading(false) } }
+  const makeTeams = async () => { setLoading(true); setGenerateError(''); try { setTeams(await generateTeams(match.id, getSessionEmail(), teamCount)); setScreen('result') } catch (error) { const message = error instanceof Error ? error.message : 'Não foi possível gerar os times agora.'; setGenerateError(message); window.alert(message) } finally { setLoading(false) } }
   const createNewMatch = async (request: CreateMatch) => { const created = await createMatch(request); setMatches(current => [...current, created]); setMatch(created); setScreen('home') }
   const addPlayer = async (player: CreatePlayer) => { const created = await createPlayer(player); setPlayers(current => [...current, created]); setScreen('players') }
   const editPlayer = async (player: CreatePlayer) => { if (!editingPlayer) return; const updated = await updatePlayer(editingPlayer.id, player); setPlayers(current => current.map(item => item.id === updated.id ? updated : item)); setScreen('players') }

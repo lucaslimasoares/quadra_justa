@@ -20,6 +20,8 @@ public static class DbInitializer
         await AddColumnIfMissingAsync(db, "Matches", "InvitedEmails", "TEXT NOT NULL DEFAULT '[]'", cancellationToken);
         await AddColumnIfMissingAsync(db, "Matches", "ModeratorEmails", "TEXT NOT NULL DEFAULT '[]'", cancellationToken);
         await AddColumnIfMissingAsync(db, "Matches", "Notes", "TEXT NULL", cancellationToken);
+        await AddColumnIfMissingAsync(db, "Matches", "MatchRules", "TEXT NOT NULL DEFAULT '[]'", cancellationToken);
+        await AddColumnIfMissingAsync(db, "Matches", "DrawRules", "TEXT NOT NULL DEFAULT '[]'", cancellationToken);
         if (await db.Matches.AnyAsync(cancellationToken)) return;
 
         var players = new[]
