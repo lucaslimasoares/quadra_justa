@@ -1,1 +1,1 @@
-export function AuthBrand() { return <header className="auth-brand"><span>A8</span><strong>Turma Arena 8</strong></header> }
+export function AuthBrand() { return <header className="auth-brand"><span>QJ</span><strong>Quadra Justa</strong></header> }

@@ -30,9 +30,10 @@ public sealed class MatchService(IMatchRepository repository) : IMatchService
         if (creator.Length == 0 || !creator.Contains('@')) throw new ArgumentException("Informe um e-mail de criador válido.");
         var invited = request.InvitedEmails?.Select(email => email.Trim().ToLowerInvariant()).Where(email => email.Contains('@')).Distinct().ToList() ?? [];
         var moderators = request.ModeratorEmails?.Select(email => email.Trim().ToLowerInvariant()).Where(email => email.Contains('@') && email != creator).Distinct().ToList() ?? [];
+        var administrators = request.AdministratorEmails?.Select(email => email.Trim().ToLowerInvariant()).Where(email => email.Contains('@') && email != creator).Distinct().ToList() ?? [];
         var matchRules = NormalizeRules(request.MatchRules);
         var drawRules = NormalizeRules(request.DrawRules);
-        var match = new Match(Guid.NewGuid(), title, request.Date, venue, request.MaxPlayers, [], privacy, creator, invited, moderators, matchRules, drawRules);
+        var match = new Match(Guid.NewGuid(), title, request.Date, venue, request.MaxPlayers, [], privacy, creator, invited, moderators, matchRules, drawRules, administrators);
         return ToDto(await repository.AddAsync(match, ct), creator);
     }
 
@@ -87,7 +88,7 @@ public sealed class MatchService(IMatchRepository repository) : IMatchService
     private static MatchDto ToDto(Match match, string email)
     {
         var role = MatchAccessPolicy.ResolveRole(match, email);
-        return new(match.Id, match.Title, match.Date, match.Venue, match.MaxPlayers, match.Players.Count(x => x.IsConfirmed), match.Players.Where(x => x.IsConfirmed).Select(ToDto).ToList(), match.Privacy, match.CreatorEmail, match.InvitedEmails, match.MatchRules, match.DrawRules, role.ToString().ToLowerInvariant(), MatchAccessPolicy.GetPermissions(role));
+        return new(match.Id, match.Title, match.Date, match.Venue, match.MaxPlayers, match.Players.Count(x => x.IsConfirmed), match.Players.Where(x => x.IsConfirmed).Select(ToDto).ToList(), match.Privacy, match.CreatorEmail, match.InvitedEmails, match.AdministratorEmails, match.MatchRules, match.DrawRules, role.ToString().ToLowerInvariant(), MatchAccessPolicy.GetPermissions(role));
     }
     private static PlayerDto ToDto(Player player) => new(player.Id, player.Name, player.Initials, player.Position, player.Level, player.Trait, player.Sports);
 }

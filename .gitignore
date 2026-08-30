@@ -2,3 +2,9 @@
 **/obj/
 **/node_modules/
 backend/QuadraJusta.Api/data/
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example

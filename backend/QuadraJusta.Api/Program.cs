@@ -5,17 +5,32 @@ using Microsoft.EntityFrameworkCore;
 using QuadraJusta.Domain.Interfaces;
 using QuadraJusta.Infrastructure.Persistence;
 using QuadraJusta.Infrastructure.Repositories;
+using Npgsql;
+using DotNetEnv;
 
+var envFile = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+if (File.Exists(envFile)) Env.Load(envFile);
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
-builder.Services.AddDbContext<QuadraJustaDbContext>(options => options.UseSqlite(builder.Configuration.GetConnectionString("QuadraJusta")));
+var databaseProvider = (Environment.GetEnvironmentVariable("DatabaseProvider") ?? builder.Configuration["DatabaseProvider"] ?? "sqlite").Trim().ToLowerInvariant();
+var configuredConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__QuadraJusta") ?? builder.Configuration.GetConnectionString("QuadraJusta")
+    ?? throw new InvalidOperationException("A connection string QuadraJusta não foi configurada.");
+var connectionString = databaseProvider is "postgres" or "postgresql"
+    ? BuildPostgresConnectionString(builder.Configuration, configuredConnectionString)
+    : configuredConnectionString;
+builder.Services.AddDbContext<QuadraJustaDbContext>(options =>
+{
+    if (databaseProvider is "postgres" or "postgresql") options.UseNpgsql(connectionString);
+    else options.UseSqlite(connectionString);
+});
 builder.Services.AddScoped<IMatchRepository, EfMatchRepository>();
 builder.Services.AddScoped<IMatchService, MatchService>();
 builder.Services.AddScoped<IPlayerRepository, EfPlayerRepository>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
 var app = builder.Build();
-using (var scope = app.Services.CreateScope())
+if (databaseProvider is not ("postgres" or "postgresql"))
 {
+    using var scope = app.Services.CreateScope();
     await DbInitializer.InitializeAsync(scope.ServiceProvider.GetRequiredService<QuadraJustaDbContext>());
 }
 app.UseCors();
@@ -37,3 +52,31 @@ players.MapPut("/{id:guid}", async (Guid id, CreatePlayerRequest request, IPlaye
     catch (ArgumentException exception) { return Results.BadRequest(exception.Message); }
 });
 app.Run();
+
+static string BuildPostgresConnectionString(IConfiguration configuration, string configuredConnectionString)
+{
+    var connectionString = configuredConnectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)
+        ? ConvertPostgresUri(configuredConnectionString)
+        : configuredConnectionString;
+    var builder = new NpgsqlConnectionStringBuilder(connectionString);
+    var password = Environment.GetEnvironmentVariable("SUPABASE_DB_PASSWORD") ?? configuration["SUPABASE_DB_PASSWORD"] ?? configuration["Supabase:Password"];
+    if (!string.IsNullOrWhiteSpace(password)) builder.Password = password;
+    if (string.IsNullOrWhiteSpace(builder.Host) || string.IsNullOrWhiteSpace(builder.Database) || string.IsNullOrWhiteSpace(builder.Username) || string.IsNullOrWhiteSpace(builder.Password))
+        throw new InvalidOperationException("Configure SUPABASE_DB_PASSWORD e uma connection string PostgreSQL válida.");
+    return builder.ConnectionString;
+}
+
+static string ConvertPostgresUri(string value)
+{
+    var uri = new Uri(value);
+    var credentials = uri.UserInfo.Split(':', 2);
+    return new NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.Port > 0 ? uri.Port : 5432,
+        Database = uri.AbsolutePath.Trim('/'),
+        Username = Uri.UnescapeDataString(credentials[0]),
+        Password = credentials.Length > 1 ? Uri.UnescapeDataString(credentials[1]) : string.Empty,
+        SslMode = SslMode.Require
+    }.ConnectionString;
+}

@@ -11,6 +11,7 @@ public sealed class MatchRecord
     public string? CreatorEmail { get; set; }
     public string InvitedEmails { get; set; } = "[]";
     public string ModeratorEmails { get; set; } = "[]";
+    public string AdministratorEmails { get; set; } = "[]";
     public string? Notes { get; set; }
     public string MatchRules { get; set; } = "[]";
     public string DrawRules { get; set; } = "[]";

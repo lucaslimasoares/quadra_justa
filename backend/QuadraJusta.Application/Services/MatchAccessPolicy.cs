@@ -10,6 +10,7 @@ public static class MatchAccessPolicy
     {
         if (string.IsNullOrWhiteSpace(match.CreatorEmail)) return ParticipantRole.Administrator;
         if (string.Equals(match.CreatorEmail, email, StringComparison.OrdinalIgnoreCase)) return ParticipantRole.Administrator;
+        if (match.AdministratorEmails.Contains(email, StringComparer.OrdinalIgnoreCase)) return ParticipantRole.Administrator;
         if (match.ModeratorEmails.Contains(email, StringComparer.OrdinalIgnoreCase)) return ParticipantRole.Moderator;
         return ParticipantRole.Participant;
     }
