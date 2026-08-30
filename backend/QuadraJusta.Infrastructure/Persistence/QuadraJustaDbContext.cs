@@ -34,7 +34,10 @@ public sealed class QuadraJustaDbContext(DbContextOptions<QuadraJustaDbContext> 
             entity.Property(match => match.Privacy).HasMaxLength(20).IsRequired();
             entity.Property(match => match.InvitedEmails).HasMaxLength(4000).IsRequired();
             entity.Property(match => match.ModeratorEmails).HasMaxLength(4000).IsRequired();
+            entity.Property(match => match.AdministratorEmails).HasMaxLength(4000).IsRequired();
             entity.Property(match => match.Notes).HasMaxLength(1000);
+            entity.Property(match => match.MatchRules).HasMaxLength(4000).IsRequired();
+            entity.Property(match => match.DrawRules).HasMaxLength(4000).IsRequired();
         });
 
         modelBuilder.Entity<MatchPlayerRecord>(entity =>

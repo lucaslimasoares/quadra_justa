@@ -12,12 +12,12 @@ public sealed class EfMatchRepository(QuadraJustaDbContext db) : IMatchRepositor
     public async Task<IReadOnlyList<Match>> GetVisibleAsync(string email, CancellationToken cancellationToken)
     {
         var records = await db.Matches.AsNoTracking().Include(match => match.Players).ThenInclude(item => item.Player).ToListAsync(cancellationToken);
-        return records.Where(record => record.Privacy == "public" || string.Equals(record.CreatorEmail, email, StringComparison.OrdinalIgnoreCase) || JsonSerializer.Deserialize<List<string>>(record.InvitedEmails)!.Contains(email, StringComparer.OrdinalIgnoreCase)).Select(ToDomain).ToList();
+        return records.Where(record => record.Privacy == "public" || string.Equals(record.CreatorEmail, email, StringComparison.OrdinalIgnoreCase) || JsonSerializer.Deserialize<List<string>>(record.AdministratorEmails)!.Contains(email, StringComparer.OrdinalIgnoreCase) || JsonSerializer.Deserialize<List<string>>(record.InvitedEmails)!.Contains(email, StringComparer.OrdinalIgnoreCase)).Select(ToDomain).ToList();
     }
 
     public async Task<Match> AddAsync(Match match, CancellationToken cancellationToken)
     {
-        db.Matches.Add(new MatchRecord { Id = match.Id, Title = match.Title, Date = match.Date, Venue = match.Venue, MaxPlayers = match.MaxPlayers, Privacy = match.Privacy, CreatorEmail = match.CreatorEmail, InvitedEmails = JsonSerializer.Serialize(match.InvitedEmails), ModeratorEmails = JsonSerializer.Serialize(match.ModeratorEmails) });
+        db.Matches.Add(new MatchRecord { Id = match.Id, Title = match.Title, Date = match.Date, Venue = match.Venue, MaxPlayers = match.MaxPlayers, Privacy = match.Privacy, CreatorEmail = match.CreatorEmail, InvitedEmails = JsonSerializer.Serialize(match.InvitedEmails), ModeratorEmails = JsonSerializer.Serialize(match.ModeratorEmails), AdministratorEmails = JsonSerializer.Serialize(match.AdministratorEmails), MatchRules = JsonSerializer.Serialize(match.MatchRules), DrawRules = JsonSerializer.Serialize(match.DrawRules) });
         await db.SaveChangesAsync(cancellationToken);
         return match;
     }
@@ -42,6 +42,6 @@ public sealed class EfMatchRepository(QuadraJustaDbContext db) : IMatchRepositor
     private static Match ToDomain(MatchRecord record)
     {
         var players = record.Players.Select(item => new Player(item.Player.Id, item.Player.Name, item.Player.Initials, item.Player.Position, item.Player.Level, item.Player.Trait, item.IsConfirmed)).ToList();
-        return new Match(record.Id, record.Title, record.Date, record.Venue, record.MaxPlayers, players, record.Privacy, record.CreatorEmail, JsonSerializer.Deserialize<List<string>>(record.InvitedEmails) ?? [], JsonSerializer.Deserialize<List<string>>(record.ModeratorEmails) ?? []);
+        return new Match(record.Id, record.Title, record.Date, record.Venue, record.MaxPlayers, players, record.Privacy, record.CreatorEmail, JsonSerializer.Deserialize<List<string>>(record.InvitedEmails) ?? [], JsonSerializer.Deserialize<List<string>>(record.ModeratorEmails) ?? [], JsonSerializer.Deserialize<List<string>>(record.MatchRules) ?? [], JsonSerializer.Deserialize<List<string>>(record.DrawRules) ?? [], JsonSerializer.Deserialize<List<string>>(record.AdministratorEmails) ?? []);
     }
 }

@@ -30,9 +30,14 @@ public sealed class MatchService(IMatchRepository repository) : IMatchService
         if (creator.Length == 0 || !creator.Contains('@')) throw new ArgumentException("Informe um e-mail de criador válido.");
         var invited = request.InvitedEmails?.Select(email => email.Trim().ToLowerInvariant()).Where(email => email.Contains('@')).Distinct().ToList() ?? [];
         var moderators = request.ModeratorEmails?.Select(email => email.Trim().ToLowerInvariant()).Where(email => email.Contains('@') && email != creator).Distinct().ToList() ?? [];
-        var match = new Match(Guid.NewGuid(), title, request.Date, venue, request.MaxPlayers, [], privacy, creator, invited, moderators);
+        var administrators = request.AdministratorEmails?.Select(email => email.Trim().ToLowerInvariant()).Where(email => email.Contains('@') && email != creator).Distinct().ToList() ?? [];
+        var matchRules = NormalizeRules(request.MatchRules);
+        var drawRules = NormalizeRules(request.DrawRules);
+        var match = new Match(Guid.NewGuid(), title, request.Date, venue, request.MaxPlayers, [], privacy, creator, invited, moderators, matchRules, drawRules, administrators);
         return ToDto(await repository.AddAsync(match, ct), creator);
     }
+
+    private static List<string> NormalizeRules(IReadOnlyList<string>? rules) => rules?.Select(rule => rule.Trim()).Where(rule => rule.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(20).ToList() ?? [];
 
     public async Task<TeamsDto?> GenerateTeamsAsync(Guid matchId, string email, GenerateTeamsRequest request, CancellationToken ct)
     {
@@ -42,21 +47,48 @@ public sealed class MatchService(IMatchRepository repository) : IMatchService
         var role = MatchAccessPolicy.ResolveRole(match, email.Trim());
         if (role is not (ParticipantRole.Administrator or ParticipantRole.Moderator)) throw new UnauthorizedAccessException("Apenas administradores e moderadores podem gerar times.");
         var players = match.Players.Where(x => x.IsConfirmed).ToList();
+        if (players.Count < request.TeamCount) throw new ArgumentException("Não há jogadores confirmados suficientes para formar os times.");
         var buckets = Enumerable.Range(0, request.TeamCount).Select(_ => new List<Player>()).ToList();
-        // Greedy balancing: ranking first makes each next player go to the currently weakest team.
-        foreach (var player in players.OrderByDescending(x => x.Level))
-            buckets.OrderBy(x => x.Sum(p => p.Level)).First().Add(player);
+        var assigned = new HashSet<Guid>();
+        var goalkeepers = players.Where(player => player.Position.Equals("Goleiro", StringComparison.OrdinalIgnoreCase)).OrderByDescending(player => player.Level).ToList();
+        if (request.SeparateGoalkeepers)
+        {
+            foreach (var goalkeeper in goalkeepers.Take(request.TeamCount))
+            {
+                buckets[goalkeepers.IndexOf(goalkeeper) % request.TeamCount].Add(goalkeeper);
+                assigned.Add(goalkeeper.Id);
+            }
+        }
+
+        var fixedPair = request.KeepCaioAndNetoTogether
+            ? players.Where(player => player.Name.Contains("Caio", StringComparison.OrdinalIgnoreCase) || player.Name.Contains("Neto", StringComparison.OrdinalIgnoreCase)).ToList()
+            : [];
+        if (fixedPair.Count > 1)
+        {
+            var target = buckets.Select((bucket, index) => (bucket, index)).OrderBy(item => item.bucket.Sum(player => player.Level)).First().index;
+            foreach (var player in fixedPair) { buckets[target].Add(player); assigned.Add(player.Id); }
+        }
+
+        foreach (var player in players.Where(player => !assigned.Contains(player.Id)).OrderByDescending(player => player.Level).ThenBy(player => player.Position))
+        {
+            var target = buckets.Select((bucket, index) => (bucket, index))
+                .OrderBy(item => item.bucket.Sum(member => member.Level))
+                .ThenBy(item => item.bucket.Count(member => member.Position == player.Position))
+                .ThenBy(item => item.index)
+                .First().index;
+            buckets[target].Add(player);
+        }
         var totals = buckets.Select(x => x.Sum(p => p.Level)).ToArray();
-        var balance = (int)Math.Round((double)totals.Min() / totals.Max() * 100);
+        var balance = totals.Max() == 0 ? 100 : (int)Math.Round((double)totals.Min() / totals.Max() * 100);
         var colors = new[] { ("Time Azul", "blue"), ("Time Laranja", "orange"), ("Time Verde", "green") };
-        var teams = buckets.Select((players, index) => new TeamDto(colors[index].Item1, colors[index].Item2, totals[index], Math.Round(totals[index] / (double)players.Count, 1), players.Select(ToDto).ToList())).ToList();
+        var teams = buckets.Select((players, index) => new TeamDto(colors[index].Item1, colors[index].Item2, totals[index], players.Count == 0 ? 0 : Math.Round(totals[index] / players.Count, 1), players.Select(ToDto).ToList())).ToList();
         return new TeamsDto(balance, teams, "Forças, posições e restrições foram distribuídas de forma muito próxima.");
     }
 
     private static MatchDto ToDto(Match match, string email)
     {
         var role = MatchAccessPolicy.ResolveRole(match, email);
-        return new(match.Id, match.Title, match.Date, match.Venue, match.MaxPlayers, match.Players.Count(x => x.IsConfirmed), match.Players.Where(x => x.IsConfirmed).Select(ToDto).ToList(), match.Privacy, match.CreatorEmail, match.InvitedEmails, role.ToString().ToLowerInvariant(), MatchAccessPolicy.GetPermissions(role));
+        return new(match.Id, match.Title, match.Date, match.Venue, match.MaxPlayers, match.Players.Count(x => x.IsConfirmed), match.Players.Where(x => x.IsConfirmed).Select(ToDto).ToList(), match.Privacy, match.CreatorEmail, match.InvitedEmails, match.AdministratorEmails, match.MatchRules, match.DrawRules, role.ToString().ToLowerInvariant(), MatchAccessPolicy.GetPermissions(role));
     }
     private static PlayerDto ToDto(Player player) => new(player.Id, player.Name, player.Initials, player.Position, player.Level, player.Trait, player.Sports);
 }
